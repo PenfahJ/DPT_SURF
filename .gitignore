@@ -1,0 +1,13 @@
+/CMakeFiles/*
+CMakeCache.txt
+classify_images
+cmake_install.cmake
+Makefile
+/patches/*
+opencv/
+opencv_contrib/
+Indoor Object Detection Dataset/*
+scene/*
+sequence_1/*
+sequence_1_exit/*
+profiling/

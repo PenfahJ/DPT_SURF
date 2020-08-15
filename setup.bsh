@@ -1,0 +1,55 @@
+#!/bin/bash
+# REQUIRES cmake, make, and build-essential
+
+command -v wget >/dev/null 2>&1 || { echo "wget required but it's not installed.  Aborting." >&2; exit 1; }
+
+#Get, build, install OpenCV
+git clone https://github.com/opencv/opencv  && \
+git clone https://github.com/opencv/opencv_contrib && \
+cd opencv_contrib && \
+git checkout 3.1.0 && \
+cd ../opencv && \
+git checkout `git rev-list -1 --before="Apr 6 2016" master` && \
+# cp ../modifiable_files/cascadedetect_exposed.hpp modules/objdetect/src/cascadedetect.hpp && \
+# cp ../modifiable_files/cascadedetect_exposed.cpp modules/objdetect/src/cascadedetect.cpp && \
+# cp ../modifiable_files/replaces.hpp modules/objdetect/src/ && \
+
+cmake -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_PRECOMPILED_HEADERS=OFF -DWITH_FFMPEG=OFF . && \
+make && \
+sudo make install && \
+cd .. #&& \
+
+#Get the dataset
+# wget https://zenodo.org/record/2654485/files/Indoor%20Object%20Detection%20Dataset.zip && \
+# unzip 'Indoor Object Detection Dataset.zip' && \
+# rm 'Indoor Object Detection Dataset.zip' && \
+mkdir scene && \
+cd ./Indoor\ Object\ Detection\ Dataset/sequence_1/ && \
+for file in $(ls); do cp $file ../../scene/; done && \
+cd ../.. && \
+
+# #Generate training set and update oracle
+# mkdir training_set && \
+# ls positive_testcases | sort | head -1500 | while read x; do cp positive_testcases/$x training_set/ && echo "training_set/"$x",1" >>oracle.csv ; done && \
+# ls negative_testcases | sort | head -1500 | while read x; do cp negative_testcases/$x training_set/ && echo "training_set/"$x",0" >>oracle.csv ; done && \
+
+# #Generate the test set and update oracle
+# mkdir test_set && \
+# ls positive_testcases | sort | tail -8500 | while read x; do cp positive_testcases/$x test_set/ && echo "test_set/"$x",1" >>oracle.csv; done && \
+# ls negative_testcases | sort | tail -8500 | while read x; do cp negative_testcases/$x test_set/ && echo "test_set/"$x",0" >>oracle.csv; done && \
+
+# #Select a test used for sensitivity analysis
+# mkdir sensitivity_set && \
+# ls positive_testcases | sort | head -1 | while read x; do cp positive_testcases/$x sensitivity_set/ && echo "sensitivity_set/"$x",1" >>oracle.csv ; done && \
+
+#Make classify_images
+cmake . && \
+make #&& \
+
+# #Setup MOEA Framework (2.9)
+# wget https://github.com/MOEAFramework/MOEAFramework/releases/download/v2.9/MOEAFramework-2.9.tar.gz && \
+# tar -xzf MOEAFramework-2.9.tar.gz && \
+# rm MOEAFramework-2.9.tar.gz && \
+
+# #Cleanup
+# rm -r positive_testcases negative_testcases
