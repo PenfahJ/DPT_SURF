@@ -19,10 +19,10 @@ make && \
 sudo make install && \
 cd .. #&& \
 
-#Get the dataset
-# wget https://zenodo.org/record/2654485/files/Indoor%20Object%20Detection%20Dataset.zip && \
-# unzip 'Indoor Object Detection Dataset.zip' && \
-# rm 'Indoor Object Detection Dataset.zip' && \
+#Get the dataset >> 10.1109/EUVIP.2018.8611732
+wget https://zenodo.org/record/2654485/files/Indoor%20Object%20Detection%20Dataset.zip && \
+unzip 'Indoor Object Detection Dataset.zip' && \
+rm 'Indoor Object Detection Dataset.zip' && \
 mkdir scene && \
 cd ./Indoor\ Object\ Detection\ Dataset/sequence_1/ && \
 for file in $(ls); do cp $file ../../scene/; done && \
