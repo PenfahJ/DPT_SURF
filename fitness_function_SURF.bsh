@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Run the fitness function. Assumes the program is already compiled. $1 == the directory containing the test images, $2 == the ./classify_images output in a completely ideal run (all negative as negative, all positive as positive). $3== timeout
+# Outputs data in the format '<execution_time_sections>,<percentage_correct_classification>'. Ouput = 'N/A,0%' if timeout
+
+# test_dir=$1
+result=$1
+oracle=$2
+
+true_pos=0
+true_neg=0
+false_pos=0
+false_neg=0
+
+while read -r line; do
+    nField=$(echo $line | awk -F "," '{print NF}')
+    image=$(echo $line | awk -F "," '{print $1}')
+    nBox=$(( ($nField-2) /4 ))
+    nBox_scene=$(awk -F "," -v image="$image" '($1==image){print $2}' $oracle)
+    unset top[@]
+    unset left[@]
+    unset width[@]
+    unset height[@]
+    unset top_scene[@]
+    unset left_scene[@]
+    unset width_scene[@]
+    unset height_scene[@]
+
+    if [[ $nBox == 0 ]]; then  # negative
+      if [[ $nBox_scene == 0 ]]; then
+        ((false_neg++))
+      else
+        true_neg=$((true_neg+$nBox_scene))
+      fi
+    else # positive
+      if [[ $nBox_scene == 0 ]]; then
+        false_neg=$((false_neg+$nBox))
+      fi
+      for ((i=0; i<$nBox; i++)); do #get detected box positions
+        top[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+1 ))'}')
+        left[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+2 ))'}')
+        width[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+3 ))'}')
+        height[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+4 ))'}')
+      done
+      for ((i=0; i<$nBox_scene; i++)); do # get ground truth box positions
+        top_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+1 ))'}' $oracle)
+        left_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+2 ))'}' $oracle)
+        width_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+3 ))'}' $oracle)
+        height_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+4 ))'}' $oracle)
+      done
+      # if [[ $nBox_scene == $nBox ]]; then
+      #
+      # else
+      #
+      # fi
+    fi
+
+    echo $true_pos "," $false_neg "," $true_neg "," $false_pos
+    # for (( i=0; i<${#top[@]}; i++ )); do
+    #   echo $image "," ${top[i]} "," ${left[i]} "," ${width[i]} "," ${height[i]}
+    # done
+done < $1
+
+exit 0
