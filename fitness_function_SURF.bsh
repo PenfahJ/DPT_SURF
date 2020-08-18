@@ -15,26 +15,28 @@ IoU(){
   local intersect=$(( (`min $r1x $r2x`-`max $l1x $l2x`)*(`min $r1y $r2y`-`max $l1y $l2y`) ))
   local union=$(( ( (r1y-l1y)*(r1x-l1x) ) + ( (r2y-l2y)*(r2x-l2x) ) - intersect ))
   local overlap_score=$(( (intersect*100)/union ))
-  echo $overlap_score $intersect $union
+  # echo `min $r1x $r2x` `max $l1x $l2x` $r1x $r2x $l1x $l2x
+  # echo `min $r1y $r2y` `max $l1y $l2y` $r1y $r2y $l1y $l2y
+  echo $overlap_score #$intersect $union
 }
 
 min(){
-  local a=$1
-  local b=$2
-  if [[ $a<$b ]]; then
-    echo $a
+  # local a=$1
+  # local b=$2
+  if [[ $1 -gt $2 ]]; then
+    echo $2
   else
-    echo $b
+    echo $1
   fi
 }
 
 max(){
-  local a=$1
-  local b=$2
-  if [[ $a>$b ]]; then
-    echo $a
+  # local a=$1
+  # local b=$2s
+  if [[ $1 -gt $2 ]]; then
+    echo $1
   else
-    echo $b
+    echo $2
   fi
 }
 
@@ -66,7 +68,7 @@ find_max(){
 	local maxval=${temp[0]}
   local i=0
 	for ((i=1; i<${#temp[@]}; i++)); do
-		if [[ ${temp[$i]} > $maxval ]]; then
+		if [[ ${temp[$i]} -gt $maxval ]]; then
 			maxval=${temp[$i]}
     fi
 	done
@@ -78,7 +80,7 @@ find_pos(){
   local val=$2
   local i=0
   for i in `seq 0 "${#temp[@]}"`; do
-    if [[ "${temp[$i]}" == "$val" ]]; then
+    if [[ "${temp[$i]}" -eq "$val" ]]; then
       echo "${i}"
     fi
   done
@@ -136,14 +138,16 @@ while read -r line; do
       left=(`rearrange left[@] order[@]`)
       width=(`rearrange width[@] order[@]`)
       height=(`rearrange height[@] order[@]`)
-      order_scene=(`sort_descending top_scene[@]`)      
+      order_scene=(`sort_descending top_scene[@]`)
       for (( i = 0; i < ${#top[@]}; i++ )); do
         overlap_score=`IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[${order_scene[$i]}]} ${left_scene[${order_scene[$i]}]} ${width_scene[${order_scene[$i]}]} ${height_scene[${order_scene[$i]}]}`
-        if [[ $overlap_score>=70 ]]; then
+        # IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[${order_scene[$i]}]} ${left_scene[${order_scene[$i]}]} ${width_scene[${order_scene[$i]}]} ${height_scene[${order_scene[$i]}]}
+        if [[ $overlap_score -ge 70 ]]; then
           ((true_pos++))
         else
           ((false_pos++))
         fi
+        echo $image $overlap_score
       done
     # else
     #
