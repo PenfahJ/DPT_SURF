@@ -12,10 +12,10 @@ IoU(){
   local l2y=$5
   local r2x=$(( l2x + $7 ))
   local r2y=$(( l2y + $8 ))
-  intersect=$(( (`min $r1x $r2x`-`max $l1x $l2x`)*(`min $r1y $r2y`-`max $l1y $l2y`) ))
-  union=$(( ( (r1y-l1y)*(r1x-l1x) ) + ( (r2y-l2y)*(r2x-l2x) ) - intersect ))
-  overlap_score=$(( (intersect*100)/union ))
-  echo $overlap_score
+  local intersect=$(( (`min $r1x $r2x`-`max $l1x $l2x`)*(`min $r1y $r2y`-`max $l1y $l2y`) ))
+  local union=$(( ( (r1y-l1y)*(r1x-l1x) ) + ( (r2y-l2y)*(r2x-l2x) ) - intersect ))
+  local overlap_score=$(( (intersect*100)/union ))
+  echo $overlap_score $intersect $union
 }
 
 min(){
@@ -136,29 +136,21 @@ while read -r line; do
       left=(`rearrange left[@] order[@]`)
       width=(`rearrange width[@] order[@]`)
       height=(`rearrange height[@] order[@]`)
-      order_scene=(`sort_descending top_scene[@]`)
-      # echo ${order_scene[@]}  ${order[@]}
-      # IoU
+      order_scene=(`sort_descending top_scene[@]`)      
+      for (( i = 0; i < ${#top[@]}; i++ )); do
+        overlap_score=`IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[${order_scene[$i]}]} ${left_scene[${order_scene[$i]}]} ${width_scene[${order_scene[$i]}]} ${height_scene[${order_scene[$i]}]}`
+        if [[ $overlap_score>=70 ]]; then
+          ((true_pos++))
+        else
+          ((false_pos++))
+        fi
+      done
     # else
     #
     fi
   fi
-
-  # arr=(5 3 6 2 9)
-  # echo `min $a $b`
-  # find_max arr[@]
-  # echo ${arr[@]}
-  # sort_descending arr[@]
-  # echo ${arr[@]}
-  # if [[ ${top[0]}>0 ]]; then
-  #   IoU ${top[0]} ${left[0]} ${width[0]} ${height[0]} ${top_scene[0]} ${left_scene[0]} ${width_scene[0]} ${height_scene[0]}
-  # fi
-
-
-  # echo $true_pos "," $false_neg "," $true_neg "," $false_pos
-  # for (( i=0; i<${#top_scene[@]}; i++ )); do
-  #   echo $image "," ${top_scene[i]} "," ${left_scene[i]} "," ${width_scene[i]} "," ${height_scene[i]}
-  # done
 done < $1
+
+echo "TruePos:"$true_pos "," "FalseNeg:"$false_neg "," "TrueNeg:"$true_neg "," "FalsePos:"$false_pos
 
 exit 0
