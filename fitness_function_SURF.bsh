@@ -3,6 +3,87 @@
 # Run the fitness function. Assumes the program is already compiled. $1 == the directory containing the test images, $2 == the ./classify_images output in a completely ideal run (all negative as negative, all positive as positive). $3== timeout
 # Outputs data in the format '<execution_time_sections>,<percentage_correct_classification>'. Ouput = 'N/A,0%' if timeout
 
+IoU(){
+  local l1x=$2
+  local l1y=$1
+  local r1x=$(( l1x + $3 ))
+  local r1y=$(( l1y + $4 ))
+  local l2x=$6
+  local l2y=$5
+  local r2x=$(( l2x + $7 ))
+  local r2y=$(( l2y + $8 ))
+  intersect=$(( (`min $r1x $r2x`-`max $l1x $l2x`)*(`min $r1y $r2y`-`max $l1y $l2y`) ))
+  union=$(( ( (r1y-l1y)*(r1x-l1x) ) + ( (r2y-l2y)*(r2x-l2x) ) - intersect ))
+  overlap_score=$(( (intersect*100)/union ))
+  echo $overlap_score
+}
+
+min(){
+  local a=$1
+  local b=$2
+  if [[ $a<$b ]]; then
+    echo $a
+  else
+    echo $b
+  fi
+}
+
+max(){
+  local a=$1
+  local b=$2
+  if [[ $a>$b ]]; then
+    echo $a
+  else
+    echo $b
+  fi
+}
+
+rearrange(){
+  local temp=("${!1}")
+  local order=("${!2}")
+  local tmp=${temp[@]}
+  local i=0
+  for (( i=0; i<${#temp[@]}; i++ )); do
+    tmp[i]=${temp["${order[$i]}"]}
+  done
+  echo ${tmp[@]}
+}
+
+sort_descending(){
+  local temp=("${!1}")
+  local i=1
+	for (( i=1; i<=${#temp[@]}; i++ )); do
+    local maxval=`find_max temp[@]`
+		local max_pos=`find_pos temp[@] $maxval`
+    local order[$(( $i-1 ))]=$max_pos
+    temp[$max_pos]=-1
+	done
+	echo ${order[@]}
+}
+
+find_max(){
+  local temp=("${!1}")
+	local maxval=${temp[0]}
+  local i=0
+	for ((i=1; i<${#temp[@]}; i++)); do
+		if [[ ${temp[$i]} > $maxval ]]; then
+			maxval=${temp[$i]}
+    fi
+	done
+  echo $maxval
+}
+
+find_pos(){
+  local temp=("${!1}")
+  local val=$2
+  local i=0
+  for i in `seq 0 "${#temp[@]}"`; do
+    if [[ "${temp[$i]}" == "$val" ]]; then
+      echo "${i}"
+    fi
+  done
+}
+
 # test_dir=$1
 result=$1
 oracle=$2
@@ -13,52 +94,71 @@ false_pos=0
 false_neg=0
 
 while read -r line; do
-    nField=$(echo $line | awk -F "," '{print NF}')
-    image=$(echo $line | awk -F "," '{print $1}')
-    nBox=$(( ($nField-2) /4 ))
-    nBox_scene=$(awk -F "," -v image="$image" '($1==image){print $2}' $oracle)
-    unset top[@]
-    unset left[@]
-    unset width[@]
-    unset height[@]
-    unset top_scene[@]
-    unset left_scene[@]
-    unset width_scene[@]
-    unset height_scene[@]
+  nField=$(echo $line | awk -F "," '{print NF}')
+  image=$(echo $line | awk -F "," '{print $1}')
+  nBox=$(( ($nField-2) /4 ))
+  nBox_scene=$(awk -F "," -v image="$image" '($1==image){print $2}' $oracle)
+  unset order[@]
+  unset top[@]
+  unset left[@]
+  unset width[@]
+  unset height[@]
+  unset top_scene[@]
+  unset left_scene[@]
+  unset width_scene[@]
+  unset height_scene[@]
 
-    if [[ $nBox == 0 ]]; then  # negative
-      if [[ $nBox_scene == 0 ]]; then
-        ((false_neg++))
-      else
-        true_neg=$((true_neg+$nBox_scene))
-      fi
-    else # positive
-      if [[ $nBox_scene == 0 ]]; then
-        false_neg=$((false_neg+$nBox))
-      fi
-      for ((i=0; i<$nBox; i++)); do #get detected box positions
-        top[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+1 ))'}')
-        left[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+2 ))'}')
-        width[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+3 ))'}')
-        height[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+4 ))'}')
-      done
-      for ((i=0; i<$nBox_scene; i++)); do # get ground truth box positions
-        top_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+1 ))'}' $oracle)
-        left_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+2 ))'}' $oracle)
-        width_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+3 ))'}' $oracle)
-        height_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+4 ))'}' $oracle)
-      done
-      # if [[ $nBox_scene == $nBox ]]; then
-      #
-      # else
-      #
-      # fi
+  if [[ $nBox == 0 ]]; then  # negative
+    if [[ $nBox_scene == 0 ]]; then
+      ((false_neg++))
+    else
+      true_neg=$(($true_neg+$nBox_scene))
     fi
+  else # positive
+    if [[ $nBox_scene == 0 ]]; then
+      false_neg=$(($false_neg+$nBox))
+    fi
+    for ((i=0; i<$nBox; i++)); do #get detected box positions
+      top[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+1 ))'}')
+      left[i]=$(echo $line"test" | awk -F "," '{print $'$(( (4*$i)+2+2 ))'}')
+      width[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+3 ))'}')
+      height[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+4 ))'}')
+    done
+    for ((i=0; i<$nBox_scene; i++)); do # get ground truth box positions
+      top_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+1 ))'}' $oracle)
+      left_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+2 ))'}' $oracle)
+      width_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+3 ))'}' $oracle)
+      height_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+4 ))'}' $oracle)
+    done
+    if [[ $nBox_scene == $nBox ]]; then
+      order=(`sort_descending top[@]`)
+      top=(`rearrange top[@] order[@]`)
+      left=(`rearrange left[@] order[@]`)
+      width=(`rearrange width[@] order[@]`)
+      height=(`rearrange height[@] order[@]`)
+      order_scene=(`sort_descending top_scene[@]`)
+      # echo ${order_scene[@]}  ${order[@]}
+      # IoU
+    # else
+    #
+    fi
+  fi
 
-    echo $true_pos "," $false_neg "," $true_neg "," $false_pos
-    # for (( i=0; i<${#top[@]}; i++ )); do
-    #   echo $image "," ${top[i]} "," ${left[i]} "," ${width[i]} "," ${height[i]}
-    # done
+  # arr=(5 3 6 2 9)
+  # echo `min $a $b`
+  # find_max arr[@]
+  # echo ${arr[@]}
+  # sort_descending arr[@]
+  # echo ${arr[@]}
+  # if [[ ${top[0]}>0 ]]; then
+  #   IoU ${top[0]} ${left[0]} ${width[0]} ${height[0]} ${top_scene[0]} ${left_scene[0]} ${width_scene[0]} ${height_scene[0]}
+  # fi
+
+
+  # echo $true_pos "," $false_neg "," $true_neg "," $false_pos
+  # for (( i=0; i<${#top_scene[@]}; i++ )); do
+  #   echo $image "," ${top_scene[i]} "," ${left_scene[i]} "," ${width_scene[i]} "," ${height_scene[i]}
+  # done
 done < $1
 
 exit 0
