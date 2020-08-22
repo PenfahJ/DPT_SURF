@@ -15,14 +15,19 @@ IoU(){
   local intersect=$(( (`min $r1x $r2x`-`max $l1x $l2x`)*(`min $r1y $r2y`-`max $l1y $l2y`) ))
   local union=$(( ( (r1y-l1y)*(r1x-l1x) ) + ( (r2y-l2y)*(r2x-l2x) ) - intersect ))
   local overlap_score=$(( (intersect*100)/union ))
-  # echo `min $r1x $r2x` `max $l1x $l2x` $r1x $r2x $l1x $l2x
-  # echo `min $r1y $r2y` `max $l1y $l2y` $r1y $r2y $l1y $l2y
   echo $overlap_score #$intersect $union
 }
 
+abs(){
+  if [[ $1 -lt 0 ]]; then
+    local a=$((0-$1))
+    echo $a
+  else
+    echo $1
+  fi
+}
+
 min(){
-  # local a=$1
-  # local b=$2
   if [[ $1 -gt $2 ]]; then
     echo $2
   else
@@ -31,8 +36,6 @@ min(){
 }
 
 max(){
-  # local a=$1
-  # local b=$2s
   if [[ $1 -gt $2 ]]; then
     echo $1
   else
@@ -75,6 +78,18 @@ find_max(){
   echo $maxval
 }
 
+find_min(){
+  local temp=("${!1}")
+	local minval=${temp[0]}
+  local i=0
+	for ((i=1; i<${#temp[@]}; i++)); do
+		if [[ ${temp[$i]} -lt $minval ]]; then
+			minval=${temp[$i]}
+    fi
+	done
+  echo $minval
+}
+
 find_pos(){
   local temp=("${!1}")
   local val=$2
@@ -86,75 +101,140 @@ find_pos(){
   done
 }
 
-# test_dir=$1
 result=$1
 oracle=$2
 
-true_pos=0
-true_neg=0
-false_pos=0
-false_neg=0
+# test_dir=$1 #scene directory
+# train_dir=$2 #object directory
+# oracle=$3
+# timeout_length=$4
 
-while read -r line; do
-  nField=$(echo $line | awk -F "," '{print NF}')
-  image=$(echo $line | awk -F "," '{print $1}')
-  nBox=$(( ($nField-2) /4 ))
-  nBox_scene=$(awk -F "," -v image="$image" '($1==image){print $2}' $oracle)
-  unset order[@]
-  unset top[@]
-  unset left[@]
-  unset width[@]
-  unset height[@]
-  unset top_scene[@]
-  unset left_scene[@]
-  unset width_scene[@]
-  unset height_scene[@]
+# temp_output=$(mktemp /tmp/XXXX)
+# timeout $timeout_length time -p ./classify_images $train_dir $test_dir &>$temp_output
+# status=$?
 
-  if [[ $nBox == 0 ]]; then  # negative
-    if [[ $nBox_scene == 0 ]]; then
-      ((false_neg++))
-    else
-      true_neg=$(($true_neg+$nBox_scene))
-    fi
-  else # positive
-    if [[ $nBox_scene == 0 ]]; then
-      false_neg=$(($false_neg+$nBox))
-    fi
-    for ((i=0; i<$nBox; i++)); do #get detected box positions
-      top[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+1 ))'}')
-      left[i]=$(echo $line"test" | awk -F "," '{print $'$(( (4*$i)+2+2 ))'}')
-      width[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+3 ))'}')
-      height[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+4 ))'}')
-    done
-    for ((i=0; i<$nBox_scene; i++)); do # get ground truth box positions
-      top_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+1 ))'}' $oracle)
-      left_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+2 ))'}' $oracle)
-      width_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+3 ))'}' $oracle)
-      height_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+4 ))'}' $oracle)
-    done
-    if [[ $nBox_scene == $nBox ]]; then
-      order=(`sort_descending top[@]`)
-      top=(`rearrange top[@] order[@]`)
-      left=(`rearrange left[@] order[@]`)
-      width=(`rearrange width[@] order[@]`)
-      height=(`rearrange height[@] order[@]`)
-      order_scene=(`sort_descending top_scene[@]`)
-      for (( i = 0; i < ${#top[@]}; i++ )); do
-        overlap_score=`IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[${order_scene[$i]}]} ${left_scene[${order_scene[$i]}]} ${width_scene[${order_scene[$i]}]} ${height_scene[${order_scene[$i]}]}`
-        # IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[${order_scene[$i]}]} ${left_scene[${order_scene[$i]}]} ${width_scene[${order_scene[$i]}]} ${height_scene[${order_scene[$i]}]}
-        if [[ $overlap_score -ge 70 ]]; then
-          ((true_pos++))
-        else
-          ((false_pos++))
-        fi
+# if [ "$status" -eq 0 ]; then
+  # time=$(cat $temp_output | awk '($1=="real"){print $2}')
+  true_pos=0
+  true_neg=0
+  false_pos=0
+  false_neg=0
+
+  # parse_temp_output=$(mktemp /tmp/XXXX)
+  # cat $temp_output | awk -F "," '(NF==2)' >$parse_temp_output
+
+  while read -r line; do
+    nField=$(echo $line | awk -F "," '{print NF}')
+    image=$(echo $line | awk -F "," '{print $1}')
+    nBox=$(( ($nField-2) /4 ))
+    nBox_scene=$(awk -F "," -v image="$image" '($1==image){print $2}' $oracle)
+    unset order[@]
+    unset top[@]
+    unset left[@]
+    unset width[@]
+    unset height[@]
+    unset top_scene[@]
+    unset left_scene[@]
+    unset width_scene[@]
+    unset height_scene[@]
+    overlap_score=0
+
+    if [[ $nBox == 0 ]]; then  # negative
+      if [[ $nBox_scene == 0 ]]; then
+        ((true_neg++))
+      else
+        false_neg=$((false_neg+nBox_scene))
+      fi
+      echo $image $overlap_score
+    else # positive
+      if [[ $nBox_scene == 0 ]]; then
+        false_pos=$((false_pos+nBox))
         echo $image $overlap_score
-      done
-    # else
-    #
+      else
+        for ((i=0; i<$nBox; i++)); do #get detected box positions
+          top[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+1 ))'}')
+          left[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+2 ))'}')
+          width[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+3 ))'}')
+          height[i]=$(echo $line | awk -F "," '{print $'$(( (4*$i)+2+4 ))'}')
+        done
+        for ((i=0; i<$nBox_scene; i++)); do # get ground truth box positions
+          top_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+1 ))'}' $oracle)
+          left_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+2 ))'}' $oracle)
+          width_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+3 ))'}' $oracle)
+          height_scene[i]=$(awk -F "," -v image="$image" '($1==image){print $'$(( (4*$i)+2+4 ))'}' $oracle)
+        done
+        order=(`sort_descending top[@]`)
+        top=(`rearrange top[@] order[@]`)
+        left=(`rearrange left[@] order[@]`)
+        width=(`rearrange width[@] order[@]`)
+        height=(`rearrange height[@] order[@]`)
+        order_scene=(`sort_descending top_scene[@]`)
+        top_scene=(`rearrange top_scene[@] order_scene[@]`)
+        left_scene=(`rearrange left_scene[@] order_scene[@]`)
+        width_scene=(`rearrange width_scene[@] order_scene[@]`)
+        height_scene=(`rearrange height_scene[@] order_scene[@]`)
+
+        if [[ $nBox_scene == $nBox ]]; then
+          for (( i = 0; i < ${#top[@]}; i++ )); do
+            overlap_score=`IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[$i]} ${left_scene[$i]} ${width_scene[$i]} ${height_scene[$i]}`
+            if [[ $overlap_score -ge 70 ]]; then
+              ((true_pos++))
+            else
+              ((false_pos++))
+            fi
+            echo $image $overlap_score
+          done
+        elif [[ $nBox_scene -gt $nBox ]]; then
+          ((false_neg=false_neg+nBox_scene-nBox))
+          for (( i = 0; i < $nBox; i++ )); do
+            for (( j = 0; j < $nBox_scene; j++ )); do
+              diff[$j]=`abs $(( top[$i] - top_scene[$j] ))`
+            done
+            min_=`find_min diff[@]`
+            match[$i]=`find_pos diff[@] $min_`
+            overlap_score=`IoU ${top[$i]} ${left[$i]} ${width[$i]} ${height[$i]} ${top_scene[${match[$i]}]} ${left_scene[${match[$i]}]} ${width_scene[${match[$i]}]} ${height_scene[${match[$i]}]}`
+            if [[ $overlap_score -ge 70 ]]; then
+              ((true_pos++))
+            else
+              ((false_pos++))
+            fi
+            echo $image $overlap_score
+          done
+        else #nBox > nBox_scene
+          ((false_pos=false_pos+nBox-nBox_scene))
+          for (( i = 0; i < $nBox_scene; i++ )); do
+            for (( j = 0; j < $nBox; j++ )); do
+              diff[$j]=`abs $(( top[$j] - top_scene[$i] ))`
+            done
+            min_=`find_min diff[@]`
+            match[$i]=`find_pos diff[@] $min_`
+            overlap_score=`IoU ${top_scene[$i]} ${left_scene[$i]} ${width_scene[$i]} ${height_scene[$i]} ${top[${match[$i]}]} ${left[${match[$i]}]} ${width[${match[$i]}]} ${height[${match[$i]}]}`
+            if [[ $overlap_score -ge 70 ]]; then
+              ((true_pos++))
+            else
+              ((false_pos++))
+            fi
+            echo $image $overlap_score
+          done
+        fi
+      fi
     fi
-  fi
+  # done < $parse_temp_output
 done < $1
 
-echo "TruePos:"$true_pos "," "FalseNeg:"$false_neg "," "TrueNeg:"$true_neg "," "FalsePos:"$false_pos
+  correct=$((true_neg+true_pos))
+  incorrect=$((false_neg+false_pos))
+
+#   if (( $(echo "($correct + $incorrect) > 0" | bc -1) )); then
+#     echo $time","$(echo "($correct / ($correct + $incorrect)) * 100" | bc -1)
+#   else
+#     echo 'N/A,0%'
+#   fi
+# else
+#   echo 'N/A,0%'
+#   echo error
+# fi
+
+# echo "TruePos:"$true_pos "," "TrueNeg:"$true_neg "," "FalseNeg:"$false_neg "," "FalsePos:"$false_pos
 
 exit 0
